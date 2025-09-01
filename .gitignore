@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtualenv
+.venv/
+
+# Env files
+.env
+.env.*
+
+# SQLite local DB
+*.db
+
+# Alembic cache
+alembic/versions/__pycache__/
