@@ -5,17 +5,24 @@ from typing import Optional
 
 from app.db.session import get_db
 from app.db import models
-from app.schemas.topic import TopicCreate, TopicRead, TopicUpdate
+from app.schemas.topic import (
+    TopicCreate, TopicRead, TopicUpdate
+)
+from app.schemas.subscription import (
+    SubscriptionCreate, SubscriptionRead,
+)
 
-app = FastAPI(title="Tips API", version="0.1.0")
+app = FastAPI(title="Tips API", version="0.2.0")
 
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
 
+# TOPICS
 
 # LIST with optional pagination & search
+
 
 @app.get("/topics", response_model=list[TopicRead])
 def list_topics(
@@ -114,5 +121,53 @@ def delete_topic(topic_id: int, db: Session = Depends(get_db)):
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found.")
     db.delete(topic)
+    db.commit()
+    return None
+
+
+# SUBSCRIPTIONS
+
+@app.get("/users/{user_id}/subscriptions", response_model=list[SubscriptionRead])
+def list_user_subscriptions(user_id: int, db: Session = Depends(get_db)):
+    subs = db.query(models.Subscription).filter(
+        models.Subscription.user_id == user_id).all()
+    return subs
+
+
+@app.post("/subscribe", response_model=SubscriptionRead, status_code=status.HTTP_201_CREATED)
+def subscribe(payload: SubscriptionCreate, db: Session = Depends(get_db)):
+    # Basic existence checks (optional but helpful)
+    user = db.query(models.User).get(payload.user_id)
+    topic = db.query(models.Topic).get(payload.topic_id)
+    if not user or not topic:
+        raise HTTPException(status_code=404, detail="User or Topic not found.")
+
+    sub = models.Subscription(user_id=payload.user_id,
+                              topic_id=payload.topic_id)
+    db.add(sub)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # Unique constraint uq_user_topic → already subscribed
+        raise HTTPException(
+            status_code=400, detail="User already subscribed to this topic.")
+    db.refresh(sub)
+    return sub
+
+
+@app.delete("/unsubscribe", status_code=status.HTTP_204_NO_CONTENT)
+def unsubscribe(payload: SubscriptionCreate, db: Session = Depends(get_db)):
+    sub = (
+        db.query(models.Subscription)
+        .filter(
+            models.Subscription.user_id == payload.user_id,
+            models.Subscription.topic_id == payload.topic_id,
+        )
+        .first()
+    )
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found.")
+    db.delete(sub)
     db.commit()
     return None
