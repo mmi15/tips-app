@@ -6,6 +6,7 @@ from typing import Optional
 from app.db.session import get_db
 from app.db import models
 from app.schemas.topic import TopicCreate, TopicUpdate, TopicRead
+from app.api.deps import get_current_active_user
 
 router = APIRouter(prefix="/topics", tags=["topics"])
 
@@ -46,28 +47,42 @@ def get_topic_by_slug(slug: str, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=TopicRead, status_code=status.HTTP_201_CREATED)
-def create_topic(payload: TopicCreate, db: Session = Depends(get_db)):
+def create_topic(
+    payload: TopicCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(
+        get_current_active_user),  # 🔒 requiere login
+):
     new_topic = models.Topic(
-        name=payload.name, slug=payload.slug, is_active=payload.is_active)
+        name=payload.name, slug=payload.slug, is_active=payload.is_active
+    )
     db.add(new_topic)
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(
-            status_code=400, detail="Topic with this slug already exists.")
+            status_code=400, detail="Topic with this slug already exists."
+        )
     db.refresh(new_topic)
     return new_topic
 
 
 @router.put("/{topic_id}", response_model=TopicRead)
-def update_topic(topic_id: int, payload: TopicUpdate, db: Session = Depends(get_db)):
+def update_topic(
+    topic_id: int,
+    payload: TopicUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user),  # 🔒
+):
     topic = db.query(models.Topic).get(topic_id)
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found.")
     if payload.name is None or payload.slug is None or payload.is_active is None:
         raise HTTPException(
-            status_code=422, detail="name, slug and is_active are required for PUT.")
+            status_code=422,
+            detail="name, slug and is_active are required for PUT.",
+        )
     topic.name = payload.name
     topic.slug = payload.slug
     topic.is_active = payload.is_active
@@ -76,13 +91,19 @@ def update_topic(topic_id: int, payload: TopicUpdate, db: Session = Depends(get_
     except IntegrityError:
         db.rollback()
         raise HTTPException(
-            status_code=400, detail="Topic with this slug already exists.")
+            status_code=400, detail="Topic with this slug already exists."
+        )
     db.refresh(topic)
     return topic
 
 
 @router.patch("/{topic_id}", response_model=TopicRead)
-def patch_topic(topic_id: int, payload: TopicUpdate, db: Session = Depends(get_db)):
+def patch_topic(
+    topic_id: int,
+    payload: TopicUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user),  # 🔒
+):
     topic = db.query(models.Topic).get(topic_id)
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found.")
@@ -97,13 +118,18 @@ def patch_topic(topic_id: int, payload: TopicUpdate, db: Session = Depends(get_d
     except IntegrityError:
         db.rollback()
         raise HTTPException(
-            status_code=400, detail="Topic with this slug already exists.")
+            status_code=400, detail="Topic with this slug already exists."
+        )
     db.refresh(topic)
     return topic
 
 
 @router.delete("/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_topic(topic_id: int, db: Session = Depends(get_db)):
+def delete_topic(
+    topic_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user),  # 🔒
+):
     topic = db.query(models.Topic).get(topic_id)
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found.")
