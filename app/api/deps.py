@@ -26,3 +26,10 @@ def get_current_active_user(user: models.User = Depends(get_current_user)) -> mo
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user.")
     return user
+
+
+def require_admin(current_user=Depends(get_current_active_user)):
+    if not getattr(current_user, "is_admin", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
+    return current_user

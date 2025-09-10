@@ -6,7 +6,7 @@ from typing import Optional
 from app.db.session import get_db
 from app.db import models
 from app.schemas.topic import TopicCreate, TopicUpdate, TopicRead
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_active_user, require_admin
 
 router = APIRouter(prefix="/topics", tags=["topics"])
 
@@ -51,7 +51,8 @@ def create_topic(
     payload: TopicCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(
-        get_current_active_user),  # 🔒 requiere login
+        get_current_active_user),
+        _admin=Depends(require_admin),
 ):
     new_topic = models.Topic(
         name=payload.name, slug=payload.slug, is_active=payload.is_active
@@ -73,7 +74,8 @@ def update_topic(
     topic_id: int,
     payload: TopicUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),  # 🔒
+    current_user: models.User = Depends(get_current_active_user),
+    _admin=Depends(require_admin),
 ):
     topic = db.query(models.Topic).get(topic_id)
     if not topic:
@@ -102,7 +104,8 @@ def patch_topic(
     topic_id: int,
     payload: TopicUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),  # 🔒
+    current_user: models.User = Depends(get_current_active_user),
+    _admin=Depends(require_admin),
 ):
     topic = db.query(models.Topic).get(topic_id)
     if not topic:
@@ -128,7 +131,8 @@ def patch_topic(
 def delete_topic(
     topic_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),  # 🔒
+    current_user: models.User = Depends(get_current_active_user),
+    _admin=Depends(require_admin),
 ):
     topic = db.query(models.Topic).get(topic_id)
     if not topic:
