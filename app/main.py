@@ -1,4 +1,4 @@
-from app.api.routes import users, topics, subscriptions, tips, auth, me
+from app.api.routes import users, topics, subscriptions, tips, auth, me, admin
 from fastapi import FastAPI
 import os
 from sqlalchemy.orm import Session
@@ -34,3 +34,4 @@ app.include_router(subscriptions.router)
 app.include_router(tips.router)
 app.include_router(auth.router)
 app.include_router(me.router)
+app.include_router(admin.router)
