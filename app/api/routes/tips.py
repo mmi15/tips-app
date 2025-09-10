@@ -8,7 +8,7 @@ from app.schemas.tip import TipCreate, TipRead, TipUpdate, TipList
 from app.services.tips import (
     create_tip, get_tip, list_tips, update_tip, hard_delete_tip
 )
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_active_user, require_admin
 
 router = APIRouter(prefix="/tips", tags=["tips"])
 
@@ -38,8 +38,8 @@ def get_tip_endpoint(tip_id: int, db: Session = Depends(get_db)):
 def create_tip_endpoint(
     payload: TipCreate,
     db: Session = Depends(get_db),
-
     _user=Depends(get_current_active_user),
+    _admin=Depends(require_admin),
 ):
     try:
         return create_tip(db, payload)
@@ -56,6 +56,7 @@ def update_tip_endpoint(
     payload: TipUpdate,
     db: Session = Depends(get_db),
     _user=Depends(get_current_active_user),
+    _admin=Depends(require_admin)
 ):
     tip = get_tip(db, tip_id)
     if not tip:
@@ -69,6 +70,7 @@ def delete_tip_endpoint(
     tip_id: int,
     db: Session = Depends(get_db),
     _user=Depends(get_current_active_user),
+    _admin=Depends(require_admin),
 ):
     tip = get_tip(db, tip_id)
     if not tip:

@@ -1,23 +1,36 @@
+from app.api.routes import users, topics, subscriptions, tips, auth, me
 from fastapi import FastAPI
-from app.api.routes.users import router as users_router
-from app.api.routes.topics import router as topics_router
-from app.api.routes.subscriptions import router as subscriptions_router
-from app.api.routes.auth import router as auth_router
-from app.api.routes.tips import router as tips_router
-from app.api.routes.me import router as me_router
+import os
+from sqlalchemy.orm import Session
+from sqlalchemy import select
+from app.db.session import SessionLocal
+from app.db.models import User
 
-app = FastAPI(title="Tips API", version="0.5.0")
+app = FastAPI(title="Tips API", version="0.6.0")
 
-
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
 
 
-# Routers
-app.include_router(auth_router)
-app.include_router(users_router)
-app.include_router(topics_router)
-app.include_router(subscriptions_router)
-app.include_router(tips_router)
-app.include_router(me_router)
+@app.on_event("startup")
+def bootstrap_admin():
+    if not ADMIN_EMAIL:
+        return
+    db: Session = SessionLocal()
+    try:
+        u = db.execute(select(User).where(
+            User.email == ADMIN_EMAIL)).scalar_one_or_none()
+        if u and not u.is_admin:
+            u.is_admin = True
+            db.add(u)
+            db.commit()
+            print(f"[BOOTSTRAP] Usuario {ADMIN_EMAIL} promovido a admin.")
+    finally:
+        db.close()
+
+
+app.include_router(users.router)
+app.include_router(topics.router)
+app.include_router(subscriptions.router)
+app.include_router(tips.router)
+app.include_router(auth.router)
+app.include_router(me.router)

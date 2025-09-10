@@ -31,6 +31,8 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     deliveries: Mapped[List["Delivery"]] = relationship(back_populates="user")
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0")
 
 
 class Topic(Base):
