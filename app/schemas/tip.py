@@ -2,6 +2,7 @@
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, HttpUrl
+from typing import List
 
 
 class TipBase(BaseModel):
@@ -38,4 +39,10 @@ class TipList(BaseModel):
     total: int
     page: int
     size: int
+    items: List[TipRead]
+
+
+class TodayTips(BaseModel):
+    date: datetime
+    count: int
     items: List[TipRead]
