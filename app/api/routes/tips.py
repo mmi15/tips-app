@@ -1,13 +1,10 @@
-# app/api/routes/tips.py
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.db.session import get_db
 from app.schemas.tip import TipCreate, TipRead, TipUpdate, TipList
-from app.services.tips import (
-    create_tip, get_tip, list_tips, update_tip, hard_delete_tip
-)
+from app.services.tips import create_tip, get_tip, list_tips, update_tip, hard_delete_tip
 from app.api.deps import get_current_active_user, require_admin
 
 router = APIRouter(prefix="/tips", tags=["tips"])
@@ -44,7 +41,6 @@ def create_tip_endpoint(
     try:
         return create_tip(db, payload)
     except ValueError as e:
-
         msg = str(e)
         code = status.HTTP_400_BAD_REQUEST if "Topic" in msg else status.HTTP_409_CONFLICT
         raise HTTPException(status_code=code, detail=msg)
@@ -56,7 +52,7 @@ def update_tip_endpoint(
     payload: TipUpdate,
     db: Session = Depends(get_db),
     _user=Depends(get_current_active_user),
-    _admin=Depends(require_admin)
+    _admin=Depends(require_admin),
 ):
     tip = get_tip(db, tip_id)
     if not tip:

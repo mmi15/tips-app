@@ -1,8 +1,11 @@
 # app/services/tips.py
 from typing import Optional, Tuple, List
+from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, delete
-from app.db.models import Tip, Topic
+from sqlalchemy.exc import IntegrityError
+from fastapi import HTTPException, status
+from app.db.models import Tip, Topic, Delivery
 from app.schemas.tip import TipCreate, TipUpdate
 import hashlib
 
@@ -97,3 +100,175 @@ def update_tip(db: Session, tip: Tip, data: TipUpdate) -> Tip:
 def hard_delete_tip(db: Session, tip_id: int) -> None:
     db.execute(delete(Tip).where(Tip.id == tip_id))
     db.commit()
+
+
+def register_deliveries_if_missing(
+    db: Session,
+    user_id: int,
+    tips: List[Tip],
+    channel: str = "app",
+    status: str = "sent",
+) -> int:
+    """
+    Inserta Delivery para cada tip si no existía (respeta UNIQUE tip_id+user_id).
+    Devuelve el número de registros NUEVOS creados.
+    """
+    created = 0
+    for tip in tips:
+        try:
+            d = Delivery(
+                tip_id=tip.id,
+                user_id=user_id,
+                delivered_at=datetime.utcnow(),
+                channel=channel,
+                status=status,
+            )
+            db.add(d)
+            db.commit()
+            created += 1
+        except IntegrityError:
+            # Ya existía una entrega para (tip, user); limpia y sigue
+            db.rollback()
+    return created
+
+
+def get_delivery_history(
+    db: Session,
+    user_id: int,
+    page: int = 1,
+    size: int = 20,
+    topic_id: Optional[int] = None,   # <-- NUEVO
+) -> Tuple[List[dict], int]:
+    """
+    Devuelve el histórico de entregas del usuario, con join a tip y topic.
+    Permite filtrar por topic_id si se especifica.
+    Retorna: (items, total)
+    """
+    base_where = [Delivery.user_id == user_id]
+    if topic_id is not None:
+        base_where.append(Topic.id == topic_id)
+
+    # Total (ojo: une con Tip/Topic solo si hay filtro por topic)
+    total_stmt = select(func.count(Delivery.id)).join(
+        Tip, Tip.id == Delivery.tip_id)
+    if topic_id is not None:
+        total_stmt = total_stmt.join(Topic, Topic.id == Tip.topic_id)
+    total = db.execute(total_stmt.where(*base_where)).scalar_one()
+
+    # Items enriquecidos
+    stmt = (
+        select(
+            Delivery.id.label("delivery_id"),
+            Delivery.delivered_at,
+            Delivery.channel,
+            Delivery.status,
+            Tip.id.label("tip_id"),
+            Tip.title,
+            Tip.body,
+            Tip.source_url,
+            Tip.created_at.label("tip_created_at"),
+            Topic.id.label("topic_id"),
+            Topic.name.label("topic_name"),
+            Topic.slug.label("topic_slug"),
+        )
+        .join(Tip, Tip.id == Delivery.tip_id)
+        .join(Topic, Topic.id == Tip.topic_id)
+        .where(*base_where)
+        .order_by(Delivery.delivered_at.desc(), Delivery.id.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    )
+
+    rows = db.execute(stmt).all()
+    items = [
+        {
+            "delivery_id": r.delivery_id,
+            "delivered_at": r.delivered_at,
+            "channel": r.channel,
+            "status": r.status,
+            "tip": {
+                "id": r.tip_id,
+                "title": r.title,
+                "body": r.body,
+                "source_url": r.source_url,
+                "created_at": r.tip_created_at,
+            },
+            "topic": {
+                "id": r.topic_id,
+                "name": r.topic_name,
+                "slug": r.topic_slug,
+            },
+        }
+        for r in rows
+    ]
+    return items, total
+
+
+def mark_delivery_read(
+    db: Session,
+    user_id: int,
+    delivery_id: int,
+) -> dict:
+    """
+    Marca una Delivery del usuario como 'read' (idempotente).
+    - 404 si no existe o no pertenece al usuario.
+    - Devuelve el registro enriquecido (como en history) para que el cliente pueda refrescar.
+    """
+    # 1) Cargar delivery del usuario
+    delivery = db.execute(
+        select(Delivery).where(
+            Delivery.id == delivery_id,
+            Delivery.user_id == user_id,
+        )
+    ).scalar_one_or_none()
+
+    if not delivery:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Delivery not found")
+
+    # 2) Idempotencia: si ya está en 'read', no hacemos commit innecesario
+    if delivery.status != "read":
+        delivery.status = "read"
+        db.add(delivery)
+        db.commit()
+        db.refresh(delivery)
+
+    # 3) Responder enriquecido (igual estructura que history)
+    row = db.execute(
+        select(
+            Delivery.id.label("delivery_id"),
+            Delivery.delivered_at,
+            Delivery.channel,
+            Delivery.status,
+            Tip.id.label("tip_id"),
+            Tip.title,
+            Tip.body,
+            Tip.source_url,
+            Tip.created_at.label("tip_created_at"),
+            Topic.id.label("topic_id"),
+            Topic.name.label("topic_name"),
+            Topic.slug.label("topic_slug"),
+        )
+        .join(Tip, Tip.id == Delivery.tip_id)
+        .join(Topic, Topic.id == Tip.topic_id)
+        .where(Delivery.id == delivery_id)
+    ).one()
+
+    return {
+        "delivery_id": row.delivery_id,
+        "delivered_at": row.delivered_at,
+        "channel": row.channel,
+        "status": row.status,
+        "tip": {
+            "id": row.tip_id,
+            "title": row.title,
+            "body": row.body,
+            "source_url": row.source_url,
+            "created_at": row.tip_created_at,
+        },
+        "topic": {
+            "id": row.topic_id,
+            "name": row.topic_name,
+            "slug": row.topic_slug,
+        },
+    }
