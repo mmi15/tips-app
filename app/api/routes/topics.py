@@ -8,9 +8,11 @@ from app.db import models
 from app.schemas.topic import TopicCreate, TopicUpdate, TopicRead
 from app.api.deps import get_current_active_user, require_admin
 
+# Create router for topic-related endpoints
 router = APIRouter(prefix="/topics", tags=["topics"])
 
 
+# List all topics with optional filters and pagination
 @router.get("", response_model=list[TopicRead])
 def list_topics(
     skip: int = 0,
@@ -19,56 +21,66 @@ def list_topics(
     only_active: bool = False,
     db: Session = Depends(get_db),
 ):
+    # Build base query
     query = db.query(models.Topic)
+    # Filter by search string (matches name or slug)
     if q:
         like = f"%{q}%"
         query = query.filter(
             (models.Topic.name.ilike(like)) | (models.Topic.slug.ilike(like))
         )
+    # Optionally filter only active topics
     if only_active:
         query = query.filter(models.Topic.is_active.is_(True))
+    # Apply pagination and return results
     return query.offset(skip).limit(limit).all()
 
 
+# Get a topic by its ID
 @router.get("/{topic_id}", response_model=TopicRead)
 def get_topic(topic_id: int, db: Session = Depends(get_db)):
     topic = db.query(models.Topic).get(topic_id)
     if not topic:
+        # Return 404 if topic not found
         raise HTTPException(status_code=404, detail="Topic not found.")
     return topic
 
 
+# Get a topic by its slug
 @router.get("/by-slug/{slug}", response_model=TopicRead)
 def get_topic_by_slug(slug: str, db: Session = Depends(get_db)):
     topic = db.query(models.Topic).filter(models.Topic.slug == slug).first()
     if not topic:
+        # Return 404 if topic not found
         raise HTTPException(status_code=404, detail="Topic not found.")
     return topic
 
 
+# Create a new topic (admin only)
 @router.post("", response_model=TopicRead, status_code=status.HTTP_201_CREATED)
 def create_topic(
     payload: TopicCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(
-        get_current_active_user),
-        _admin=Depends(require_admin),
+    current_user: models.User = Depends(get_current_active_user),
+    _admin=Depends(require_admin),
 ):
+    # Create a new Topic instance
     new_topic = models.Topic(
         name=payload.name, slug=payload.slug, is_active=payload.is_active
     )
     db.add(new_topic)
     try:
-        db.commit()
+        db.commit()  # Save changes
     except IntegrityError:
-        db.rollback()
+        db.rollback()  # Undo transaction if slug already exists
         raise HTTPException(
             status_code=400, detail="Topic with this slug already exists."
         )
-    db.refresh(new_topic)
+    db.refresh(new_topic)  # Reload instance with DB-generated values
     return new_topic
 
 
+# Fully update a topic (admin only, all fields required)
 @router.put("/{topic_id}", response_model=TopicRead)
 def update_topic(
     topic_id: int,
@@ -80,11 +92,13 @@ def update_topic(
     topic = db.query(models.Topic).get(topic_id)
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found.")
+    # PUT requires all fields
     if payload.name is None or payload.slug is None or payload.is_active is None:
         raise HTTPException(
             status_code=422,
             detail="name, slug and is_active are required for PUT.",
         )
+    # Update all fields
     topic.name = payload.name
     topic.slug = payload.slug
     topic.is_active = payload.is_active
@@ -99,6 +113,7 @@ def update_topic(
     return topic
 
 
+# Partially update a topic (admin only)
 @router.patch("/{topic_id}", response_model=TopicRead)
 def patch_topic(
     topic_id: int,
@@ -110,6 +125,7 @@ def patch_topic(
     topic = db.query(models.Topic).get(topic_id)
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found.")
+    # Only update provided fields
     if payload.name is not None:
         topic.name = payload.name
     if payload.slug is not None:
@@ -127,6 +143,7 @@ def patch_topic(
     return topic
 
 
+# Delete a topic permanently (admin only)
 @router.delete("/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_topic(
     topic_id: int,
@@ -136,7 +153,8 @@ def delete_topic(
 ):
     topic = db.query(models.Topic).get(topic_id)
     if not topic:
+        # Return 404 if topic not found
         raise HTTPException(status_code=404, detail="Topic not found.")
     db.delete(topic)
-    db.commit()
+    db.commit()  # Commit deletion
     return None
