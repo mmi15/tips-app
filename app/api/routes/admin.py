@@ -6,6 +6,9 @@ from app.db.session import get_db
 from app.db.models import User
 from app.api.deps import require_admin
 
+
+# Create an APIRouter instance for admin-related endpoints
+# All routes defined here will have the prefix "/admin"
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
@@ -15,6 +18,15 @@ def promote_user(
     db: Session = Depends(get_db),
     _admin=Depends(require_admin)
 ):
+    """
+    Promote a regular user to admin.
+
+    - Only accessible to existing admins (require_admin dependency).
+    - Looks up the user by ID.
+    - If the user doesn't exist, raises 404.
+    - If the user is already admin, raises 400.
+    - Otherwise, sets user.is_admin = True and commits the change.
+    """
     user = db.execute(select(User).where(
         User.id == user_id)).scalar_one_or_none()
     if not user:
@@ -36,6 +48,16 @@ def demote_user(
     db: Session = Depends(get_db),
     current_admin=Depends(require_admin),
 ):
+    """
+    Demote an admin back to a regular user.
+
+    - Only accessible to admins (require_admin dependency).
+    - Looks up the user by ID.
+    - If the user doesn't exist, raises 404.
+    - Prevents an admin from demoting themselves (400).
+    - If the user is not currently admin, raises 400.
+    - Otherwise, sets user.is_admin = False and commits the change.
+    """
     user = db.execute(select(User).where(
         User.id == user_id)).scalar_one_or_none()
     if not user:

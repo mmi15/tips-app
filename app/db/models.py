@@ -10,11 +10,15 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
+# Base class for all SQLAlchemy models
 class Base(DeclarativeBase):
-    """Declarative basis for all models."""
+    """Declarative base class."""
     pass
 
 
+# -------------------------------
+# USER MODEL
+# -------------------------------
 class User(Base):
     __tablename__ = "users"
 
@@ -26,15 +30,19 @@ class User(Base):
         Boolean, default=True, server_default="1")
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False)
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0")
 
+    # Relationships
     subscriptions: Mapped[List["Subscription"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
     deliveries: Mapped[List["Delivery"]] = relationship(back_populates="user")
-    is_admin: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default="0")
 
 
+# -------------------------------
+# TOPIC MODEL
+# -------------------------------
 class Topic(Base):
     __tablename__ = "topics"
 
@@ -47,12 +55,16 @@ class Topic(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False)
 
+    # Relationships
     tips: Mapped[List["Tip"]] = relationship(
         back_populates="topic", cascade="all, delete-orphan")
     subscriptions: Mapped[List["Subscription"]
                           ] = relationship(back_populates="topic")
 
 
+# -------------------------------
+# SUBSCRIPTION MODEL
+# -------------------------------
 class Subscription(Base):
     __tablename__ = "subscriptions"
     __table_args__ = (
@@ -69,10 +81,14 @@ class Subscription(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False)
 
+    # Relationships
     user: Mapped["User"] = relationship(back_populates="subscriptions")
     topic: Mapped["Topic"] = relationship(back_populates="subscriptions")
 
 
+# -------------------------------
+# TIP MODEL
+# -------------------------------
 class Tip(Base):
     __tablename__ = "tips"
     __table_args__ = (
@@ -87,15 +103,19 @@ class Tip(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     source_url: Mapped[Optional[str]] = mapped_column(String(1024))
     fingerprint: Mapped[Optional[str]] = mapped_column(
-        String(64), index=True)  # para deduplicación
+        String(64), index=True)  # Used for deduplication
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False)
 
+    # Relationships
     topic: Mapped["Topic"] = relationship(back_populates="tips")
     deliveries: Mapped[List["Delivery"]] = relationship(
         back_populates="tip", cascade="all, delete-orphan")
 
 
+# -------------------------------
+# DELIVERY MODEL
+# -------------------------------
 class Delivery(Base):
     __tablename__ = "deliveries"
     __table_args__ = (
@@ -110,9 +130,10 @@ class Delivery(Base):
     delivered_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False)
     channel: Mapped[str] = mapped_column(
-        String(20), default="app")     # app | push | email
+        String(20), default="app")  # app | push | email
     status: Mapped[str] = mapped_column(
-        String(20), default="sent")     # sent | read | failed
+        String(20), default="sent")  # sent | read | failed
 
+    # Relationships
     tip: Mapped["Tip"] = relationship(back_populates="deliveries")
     user: Mapped["User"] = relationship(back_populates="deliveries")
