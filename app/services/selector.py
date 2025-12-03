@@ -1,7 +1,7 @@
 # app/services/selector.py
 
 from __future__ import annotations
-from datetime import datetime, date
+from datetime import datetime, date, time
 from typing import List, Tuple, Optional
 from sqlalchemy import select, func, exists, and_
 from sqlalchemy.orm import Session
@@ -220,3 +220,142 @@ def get_today_tips_for_user(
         flat_tips.extend(picks)
 
     return today_local, flat_tips
+
+
+def _select_tip_for_user_topic_on_date(
+    db: Session,
+    user_id: int,
+    topic_id: int,
+    target_date: date,
+) -> Optional[Tip]:
+    """
+    Elige de forma determinística un Tip para (user, topic, fecha)
+    usando _daily_index.
+    """
+    tips = (
+        db.execute(
+            select(Tip)
+            .where(Tip.topic_id == topic_id)
+            .order_by(Tip.id.asc())
+        )
+        .scalars()
+        .all()
+    )
+
+    if not tips:
+        return None
+
+    idx = _daily_index(
+        seed_date=target_date,
+        user_id=user_id,
+        topic_id=topic_id,
+        modulo=len(tips),
+    )
+    return tips[idx]
+
+
+def _ensure_delivery_for_user_topic_date(
+    db: Session,
+    user_id: int,
+    topic_id: int,
+    target_date: date,
+    tz: str = "Europe/Madrid",
+) -> Tuple[Optional[Delivery], bool]:
+    """
+    Garantiza que exista una Delivery para (user, topic, fecha).
+
+    Como la tabla deliveries solo guarda tip_id (no topic_id),
+    la unicidad se controla por:
+      - user_id
+      - tip_id
+      - fecha (delivered_at)
+
+    Devuelve:
+      (delivery, created_new)
+        - delivery: la Delivery encontrada o creada (o None si no hay tips)
+        - created_new: True si se ha creado ahora, False si ya existía
+    """
+
+    # 1) Elegimos el tip determinístico para ese día
+    tip = _select_tip_for_user_topic_on_date(
+        db, user_id, topic_id, target_date)
+    if tip is None:
+        return None, False
+
+    # 2) ¿Ya hay delivery para ese user + tip en esa fecha?
+    existing = (
+        db.execute(
+            select(Delivery)
+            .where(Delivery.user_id == user_id)
+            .where(Delivery.tip_id == tip.id)
+            .where(func.date(Delivery.delivered_at) == target_date)
+        )
+        .scalars()
+        .first()
+    )
+
+    if existing:
+        return existing, False
+
+    # 3) Creamos una delivery nueva a una hora "lógica"
+    tzinfo = ZoneInfo(tz)
+    delivered_dt = datetime(
+        year=target_date.year,
+        month=target_date.month,
+        day=target_date.day,
+        hour=8,
+        minute=0,
+        tzinfo=tzinfo,
+    )
+
+    delivery = Delivery(
+        user_id=user_id,
+        tip_id=tip.id,
+        delivered_at=delivered_dt,
+    )
+    db.add(delivery)
+    db.commit()
+    db.refresh(delivery)
+
+    return delivery, True
+
+
+def create_daily_deliveries_for_all_users(
+    db: Session,
+    target_date: date,
+    tz: str = "Europe/Madrid",
+) -> int:
+    """
+    Recorre todos los usuarios que tienen al menos una Subscription
+    y les genera la Delivery del día por cada topic suscrito.
+
+    Devuelve el número TOTAL de deliveries NUEVAS creadas.
+    """
+
+    # 1) Sacamos los user_id distintos que tienen alguna suscripción
+    user_ids: List[int] = (
+        db.execute(
+            select(Subscription.user_id).distinct()
+        )
+        .scalars()
+        .all()
+    )
+
+    total_new = 0
+
+    for user_id in user_ids:
+        # 2) Topics suscritos de ese usuario
+        topics = get_user_subscribed_topics(db, user_id)
+
+        for topic in topics:
+            _, created_new = _ensure_delivery_for_user_topic_date(
+                db=db,
+                user_id=user_id,
+                topic_id=topic.id,
+                target_date=target_date,
+                tz=tz,
+            )
+            if created_new:
+                total_new += 1
+
+    return total_new

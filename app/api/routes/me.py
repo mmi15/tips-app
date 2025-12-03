@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from app.db.session import get_db
 from app.api.deps import get_current_active_user
 from app.schemas.tip import TodayTips, TipRead
+from app.db.models import Delivery, Tip, User
 from app.schemas.me_tips import HistoryList, DeliveryStatusResponse
 
 from app.services.tips import (
@@ -97,6 +98,78 @@ def mark_tip_as_read(
 ):
     # Delegate to service layer to validate ownership and update read status.
     return mark_delivery_read(db, user_id=current_user.id, delivery_id=delivery_id)
+
+
+@router.get("/tips/today", response_model=TodayTips)
+def get_today_tips(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> TodayTips:
+    """
+    Devuelve los tips de HOY para el usuario autenticado,
+    basados en las deliveries ya generadas.
+    """
+
+    # Fecha "hoy" en tu zona horaria principal
+    tz = ZoneInfo("Europe/Madrid")
+    today_local = datetime.now(tz).date()
+
+    # Buscamos las deliveries del usuario para la fecha de hoy
+    deliveries = (
+        db.execute(
+            select(Delivery)
+            .join(Tip, Tip.id == Delivery.tip_id)
+            .where(Delivery.user_id == current_user.id)
+            .where(func.date(Delivery.delivered_at) == today_local)
+            .order_by(Delivery.delivered_at.asc())
+        )
+        .scalars()
+        .all()
+    )
+
+    # Convertimos los Tip asociados a esas deliveries a TipRead
+    tips_read: list[TipRead] = [
+        TipRead.model_validate(delivery.tip)  # .from_orm(...) si usas orm_mode
+        for delivery in deliveries
+        if delivery.tip is not None
+    ]
+
+    return TodayTips(
+        date=today_local,
+        tips=tips_read,
+    )
+
+
+@router.get("/tips/history", response_model=list[TipRead])
+def get_tips_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    limit: int = Query(
+        20, ge=1, le=100, description="Número máximo de tips a devolver"),
+    offset: int = Query(0, ge=0, description="Desplazamiento/paginación"),
+):
+    """
+    Devuelve el historial de tips (via Delivery) del usuario actual,
+    ordenados por delivered_at DESC (más recientes primero).
+    """
+    query = (
+        select(Delivery)
+        .join(Tip, Tip.id == Delivery.tip_id)
+        .where(Delivery.user_id == current_user.id)
+        .order_by(Delivery.delivered_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+
+    deliveries = db.execute(query).scalars().all()
+
+    tips = [
+        TipRead.model_validate(delivery.tip)
+        for delivery in deliveries
+        if delivery.tip is not None
+    ]
+
+    return tips
 
 
 def apply_plan_policy(
