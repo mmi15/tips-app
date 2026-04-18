@@ -1,7 +1,11 @@
 # app/main.py
 
+from pathlib import Path
+
 from app.api.routes import users, topics, subscriptions, tips, auth, me, admin
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 import os
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -68,3 +72,21 @@ app.include_router(tips.router)
 app.include_router(auth.router)
 app.include_router(me.router)
 app.include_router(admin.router)
+
+# ------------------------------
+# MVP web UI (static HTML/JS)
+# ------------------------------
+_STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+
+@app.get("/")
+def web_app():
+    """Sirve la mini-app del MVP; la API sigue en /auth, /topics, /me, etc."""
+    return FileResponse(_STATIC_DIR / "index.html")
+
+
+app.mount(
+    "/static",
+    StaticFiles(directory=_STATIC_DIR),
+    name="static",
+)
