@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tips — MVP</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="header">
+      <h1>Tips</h1>
+      <p class="tagline">Un tip corto al día por cada tema que elijas</p>
+    </header>
+
+    <main class="main">
+      <p id="flash" class="flash" role="status" hidden></p>
+
+      <section id="auth-section" class="card">
+        <h2>Cuenta</h2>
+        <div id="auth-logged-out">
+          <div class="auth-tabs" role="tablist">
+            <button
+              type="button"
+              id="tab-register"
+              class="auth-tab active"
+              role="tab"
+              aria-selected="true"
+              aria-controls="panel-register"
+            >
+              Crear cuenta
+            </button>
+            <button
+              type="button"
+              id="tab-login"
+              class="auth-tab"
+              role="tab"
+              aria-selected="false"
+              aria-controls="panel-login"
+            >
+              Iniciar sesión
+            </button>
+          </div>
+
+          <div
+            id="panel-register"
+            class="auth-panel"
+            role="tabpanel"
+            aria-labelledby="tab-register"
+          >
+            <p class="hint auth-intro">
+              Regístrate con tu email. Después podrás elegir temas y ver tus tips del día.
+            </p>
+            <form id="form-register" class="auth-form" novalidate>
+              <label class="field">
+                <span>Email</span>
+                <input
+                  type="email"
+                  id="reg-email"
+                  name="email"
+                  autocomplete="email"
+                  required
+                  placeholder="tu@email.com"
+                />
+              </label>
+              <label class="field">
+                <span>Contraseña</span>
+                <input
+                  type="password"
+                  id="reg-password"
+                  name="password"
+                  autocomplete="new-password"
+                  required
+                  minlength="6"
+                  placeholder="Mínimo 6 caracteres"
+                />
+              </label>
+              <label class="field">
+                <span>Repetir contraseña</span>
+                <input
+                  type="password"
+                  id="reg-password-confirm"
+                  name="password-confirm"
+                  autocomplete="new-password"
+                  required
+                  minlength="6"
+                  placeholder="Igual que arriba"
+                />
+              </label>
+              <button type="submit" id="btn-register-submit" class="btn primary wide">
+                Crear mi cuenta
+              </button>
+            </form>
+          </div>
+
+          <div
+            id="panel-login"
+            class="auth-panel"
+            role="tabpanel"
+            aria-labelledby="tab-login"
+            hidden
+          >
+            <p class="hint auth-intro">Si ya tienes cuenta, entra con tu email y contraseña.</p>
+            <form id="form-login" class="auth-form" novalidate>
+              <label class="field">
+                <span>Email</span>
+                <input
+                  type="email"
+                  id="login-email"
+                  name="email"
+                  autocomplete="username"
+                  required
+                />
+              </label>
+              <label class="field">
+                <span>Contraseña</span>
+                <input
+                  type="password"
+                  id="login-password"
+                  name="password"
+                  autocomplete="current-password"
+                  required
+                />
+              </label>
+              <button type="submit" id="btn-login-submit" class="btn primary wide">
+                Entrar
+              </button>
+            </form>
+          </div>
+        </div>
+        <div id="auth-logged-in" hidden>
+          <p class="user-line">Sesión: <strong id="user-email"></strong></p>
+          <button type="button" id="btn-logout" class="btn ghost">Cerrar sesión</button>
+        </div>
+      </section>
+
+      <section id="app-section" class="card" hidden>
+        <h2>Mis temas</h2>
+        <p class="hint">Activa suscripciones y luego carga tus tips de hoy.</p>
+        <div id="topics-list" class="topics"></div>
+
+        <h2 class="mt">Tips de hoy</h2>
+        <label class="field inline">
+          <span>Zona horaria (IANA)</span>
+          <input
+            type="text"
+            id="tz"
+            placeholder="ej. Europe/Madrid"
+            autocomplete="off"
+            spellcheck="false"
+            title="Nombre IANA, p. ej. America/Mexico_City"
+          />
+        </label>
+        <p class="hint tz-hint">Se usa para calcular “hoy”. Se guarda en este dispositivo.</p>
+        <button type="button" id="btn-today" class="btn primary">Actualizar tips de hoy</button>
+        <div id="tips-today" class="tips"></div>
+
+        <h2 class="mt">Historial</h2>
+        <p class="hint">
+          Tips que ya se te han enviado. Marca los que hayas leído.
+        </p>
+        <div class="history-toolbar">
+          <label class="field inline">
+            <span>Tema</span>
+            <select id="history-topic-select" aria-label="Filtrar historial por tema">
+              <option value="">Todos</option>
+            </select>
+          </label>
+          <label class="field inline">
+            <span>Por página</span>
+            <select id="history-size" aria-label="Tamaño de página del historial">
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="20">20</option>
+            </select>
+          </label>
+          <button type="button" id="btn-history-refresh" class="btn secondary">
+            Cargar historial
+          </button>
+        </div>
+        <div id="tips-history" class="tips history-list"></div>
+        <div id="history-pagination" class="history-pagination" hidden>
+          <button type="button" id="btn-history-prev" class="btn ghost small">Anterior</button>
+          <span id="history-page-info" class="history-page-info"></span>
+          <button type="button" id="btn-history-next" class="btn ghost small">Siguiente</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <small>MVP local — misma API que <code>/docs</code></small>
+    </footer>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
