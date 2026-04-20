@@ -32,6 +32,10 @@ class User(Base):
         DateTime, default=datetime.utcnow, nullable=False)
     is_admin: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="0")
+    locale: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="es", server_default="es")
+    iana_timezone: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True)
 
     # Relationships
     subscriptions: Mapped[List["Subscription"]] = relationship(

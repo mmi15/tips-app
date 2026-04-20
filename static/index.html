@@ -134,6 +134,23 @@
       </section>
 
       <section id="app-section" class="card" hidden>
+        <h2>Preferencias de cuenta</h2>
+        <p class="hint">
+          Idioma para fechas en esta página y zona horaria guardada (se aplica cuando no indicas otra en “Tips de hoy”).
+        </p>
+        <div class="prefs-row">
+          <label class="field inline">
+            <span>Idioma</span>
+            <select id="pref-locale" aria-label="Idioma de la interfaz de fechas">
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <button type="button" id="btn-save-prefs" class="btn secondary">
+            Guardar en la cuenta
+          </button>
+        </div>
+
         <h2>Mis temas</h2>
         <p class="hint">Activa suscripciones y luego carga tus tips de hoy.</p>
         <div id="topics-list" class="topics"></div>
@@ -150,7 +167,9 @@
             title="Nombre IANA, p. ej. America/Mexico_City"
           />
         </label>
-        <p class="hint tz-hint">Se usa para calcular “hoy”. Se guarda en este dispositivo.</p>
+        <p class="hint tz-hint">
+          Se usa para calcular “hoy”. Puedes guardarla en tu cuenta arriba; aquí también se recuerda en este dispositivo.
+        </p>
         <button type="button" id="btn-today" class="btn primary">Actualizar tips de hoy</button>
         <div id="tips-today" class="tips"></div>
 

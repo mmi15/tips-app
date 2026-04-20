@@ -78,6 +78,24 @@ body {
   font-weight: 600;
 }
 
+.prefs-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.prefs-row .field {
+  margin: 0;
+  flex: 1 1 12rem;
+}
+
+.prefs-row .btn {
+  flex: 0 0 auto;
+  align-self: center;
+}
+
 .card h2.mt {
   margin-top: 1.5rem;
 }

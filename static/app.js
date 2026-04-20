@@ -33,6 +33,7 @@
   let historyPage = 1;
   let historyLastTotal = 0;
   let historyLastSize = 10;
+  let userLocale = "es";
 
   const flash = $("flash");
   const authLoggedOut = $("auth-logged-out");
@@ -120,11 +121,30 @@
     }
   }
 
+  function applyMeToPreferencesUi(me) {
+    userLocale = (me && me.locale) || "es";
+    const locSel = $("pref-locale");
+    if (locSel) {
+      const v = userLocale;
+      if ([...locSel.options].some((o) => o.value === v)) locSel.value = v;
+      else locSel.value = "es";
+    }
+    const tzEl = $("tz");
+    if (!tzEl) return;
+    if (me && me.iana_timezone && String(me.iana_timezone).trim()) {
+      tzEl.value = String(me.iana_timezone).trim();
+      persistTimeZone(tzEl.value);
+    } else {
+      tzEl.value = getSavedTimeZone();
+    }
+  }
+
   async function refreshMe() {
     if (!getToken()) return;
     try {
       const me = await api("/auth/me", { method: "GET" });
       $("user-email").textContent = me.email || "";
+      applyMeToPreferencesUi(me);
     } catch (e) {
       setToken(null);
       updateAuthUi();
@@ -150,7 +170,8 @@
   function formatDeliveredAt(iso) {
     try {
       const d = new Date(iso);
-      return d.toLocaleString("es-ES", {
+      const loc = userLocale && userLocale.length ? userLocale : "es";
+      return d.toLocaleString(loc, {
         dateStyle: "short",
         timeStyle: "short",
       });
@@ -355,13 +376,14 @@
   async function loadTodayTips() {
     const rawTz = ($("tz").value || "").trim();
     const tz = rawTz || getSavedTimeZone();
-    if ($("tz").value.trim() !== tz) $("tz").value = tz;
+    if (($("tz").value || "").trim() !== tz) $("tz").value = tz;
     persistTimeZone(tz);
     const host = $("tips-today");
     host.innerHTML = '<p class="empty">Cargando…</p>';
     try {
       clearFlash();
-      const q = new URLSearchParams({ tz, per_topic: "1" });
+      const q = new URLSearchParams({ per_topic: "1" });
+      if (rawTz) q.set("tz", rawTz);
       const data = await api("/me/tips/today?" + q.toString(), { method: "GET" });
       host.innerHTML = "";
       const head = document.createElement("p");
@@ -503,6 +525,35 @@
   });
 
   $("btn-today").addEventListener("click", () => loadTodayTips());
+
+  $("btn-save-prefs").addEventListener("click", async () => {
+    if (!getToken()) return;
+    const locale = ($("pref-locale").value || "es").trim();
+    const tzRaw = ($("tz").value || "").trim();
+    const submit = $("btn-save-prefs");
+    submit.disabled = true;
+    try {
+      clearFlash();
+      const body = { locale };
+      body.iana_timezone = tzRaw || null;
+      const updated = await api("/me/preferences", {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+      userLocale = updated.locale || "es";
+      if (updated.iana_timezone) {
+        $("tz").value = updated.iana_timezone;
+        persistTimeZone(updated.iana_timezone);
+      } else {
+        persistTimeZone($("tz").value);
+      }
+      showFlash("Preferencias guardadas.", "ok");
+    } catch (e) {
+      showFlash(e.message, "error");
+    } finally {
+      submit.disabled = false;
+    }
+  });
 
   $("tz").addEventListener("change", () => {
     persistTimeZone($("tz").value);
