@@ -1,6 +1,6 @@
 # app/schemas/tip.py
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -91,7 +91,7 @@ class TipList(BaseModel):
 # ------------------------------
 class TodayTips(BaseModel):
     # Date the tips were generated or delivered
-    date: datetime
+    date: date
     # Total number of tips returned
     count: int
     # List of today's tips

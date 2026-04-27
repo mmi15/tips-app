@@ -1,5 +1,5 @@
 # app/api/routes/me.py
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime
@@ -8,8 +8,10 @@ from zoneinfo import ZoneInfo
 from app.db.session import get_db
 from app.api.deps import get_current_active_user
 from app.schemas.tip import TodayTips, TipRead
-from app.db.models import Delivery, Tip, User
+from app.db.models import User
 from app.schemas.me_tips import HistoryList, DeliveryStatusResponse
+from app.schemas.preferences import UserPreferencesRead, UserPreferencesUpdate
+from app.core.timezones import resolve_effective_timezone
 
 from app.services.tips import (
     register_deliveries_if_missing,
@@ -26,11 +28,35 @@ from app.services.selector import (
 router = APIRouter(prefix="/me", tags=["me"])
 
 
+@router.get("/preferences", response_model=UserPreferencesRead)
+def get_my_preferences(
+    current_user: User = Depends(get_current_active_user),
+):
+    return UserPreferencesRead.model_validate(current_user)
+
+
+@router.patch("/preferences", response_model=UserPreferencesRead)
+def patch_my_preferences(
+    payload: UserPreferencesUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    data = payload.model_dump(exclude_unset=True)
+    if "locale" in data:
+        current_user.locale = data["locale"]
+    if "iana_timezone" in data:
+        current_user.iana_timezone = data["iana_timezone"]
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return UserPreferencesRead.model_validate(current_user)
+
+
 @router.get("/tips/today", response_model=TodayTips)
 def get_my_today_tips(
-    # Optional IANA timezone. Used to compute "today" for the user.
+    # Optional override; if omitted, uses stored iana_timezone or server default.
     tz: Optional[str] = Query(
-        "Europe/Madrid", description="Zona horaria IANA, ej. Europe/Madrid"),
+        None, description="Zona horaria IANA (opcional); prioriza sobre la guardada"),
     # Desired number of tips per topic (clamped by plan policy later).
     per_topic: int = Query(
         1, ge=1, le=5, description="Número de tips por topic (rotados)"),
@@ -39,6 +65,15 @@ def get_my_today_tips(
     # Current authenticated and active user (JWT-based).
     current_user=Depends(get_current_active_user),
 ):
+    try:
+        tz_effective = resolve_effective_timezone(
+            tz, current_user.iana_timezone)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
     # 1) Apply plan limits (free vs premium), without mutating DB.
     topics_allowed, per_topic_effective = apply_plan_policy(
         db, current_user, per_topic)
@@ -50,7 +85,7 @@ def get_my_today_tips(
         user_id=current_user.id,
         per_topic=per_topic_effective,
         strategy="latest",
-        tz_name=tz,
+        tz_name=tz_effective,
         topics_override=topics_allowed,
     )
 
@@ -63,7 +98,11 @@ def get_my_today_tips(
     # Build response items as Pydantic models.
     items = [TipRead.model_validate(t) for t in tips_flat]
     # TodayTips intentionally omits plan metadata to keep the response stable.
-    return TodayTips(date=datetime.now(ZoneInfo(tz)).date(), count=len(items), items=items)
+    return TodayTips(
+        date=datetime.now(ZoneInfo(tz_effective)).date(),
+        count=len(items),
+        items=items,
+    )
 
 
 @router.get("/tips/history", response_model=HistoryList)
@@ -98,78 +137,6 @@ def mark_tip_as_read(
 ):
     # Delegate to service layer to validate ownership and update read status.
     return mark_delivery_read(db, user_id=current_user.id, delivery_id=delivery_id)
-
-
-@router.get("/tips/today", response_model=TodayTips)
-def get_today_tips(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-) -> TodayTips:
-    """
-    Devuelve los tips de HOY para el usuario autenticado,
-    basados en las deliveries ya generadas.
-    """
-
-    # Fecha "hoy" en tu zona horaria principal
-    tz = ZoneInfo("Europe/Madrid")
-    today_local = datetime.now(tz).date()
-
-    # Buscamos las deliveries del usuario para la fecha de hoy
-    deliveries = (
-        db.execute(
-            select(Delivery)
-            .join(Tip, Tip.id == Delivery.tip_id)
-            .where(Delivery.user_id == current_user.id)
-            .where(func.date(Delivery.delivered_at) == today_local)
-            .order_by(Delivery.delivered_at.asc())
-        )
-        .scalars()
-        .all()
-    )
-
-    # Convertimos los Tip asociados a esas deliveries a TipRead
-    tips_read: list[TipRead] = [
-        TipRead.model_validate(delivery.tip)  # .from_orm(...) si usas orm_mode
-        for delivery in deliveries
-        if delivery.tip is not None
-    ]
-
-    return TodayTips(
-        date=today_local,
-        tips=tips_read,
-    )
-
-
-@router.get("/tips/history", response_model=list[TipRead])
-def get_tips_history(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-    limit: int = Query(
-        20, ge=1, le=100, description="Número máximo de tips a devolver"),
-    offset: int = Query(0, ge=0, description="Desplazamiento/paginación"),
-):
-    """
-    Devuelve el historial de tips (via Delivery) del usuario actual,
-    ordenados por delivered_at DESC (más recientes primero).
-    """
-    query = (
-        select(Delivery)
-        .join(Tip, Tip.id == Delivery.tip_id)
-        .where(Delivery.user_id == current_user.id)
-        .order_by(Delivery.delivered_at.desc())
-        .limit(limit)
-        .offset(offset)
-    )
-
-    deliveries = db.execute(query).scalars().all()
-
-    tips = [
-        TipRead.model_validate(delivery.tip)
-        for delivery in deliveries
-        if delivery.tip is not None
-    ]
-
-    return tips
 
 
 def apply_plan_policy(

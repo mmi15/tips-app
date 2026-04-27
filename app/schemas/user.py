@@ -48,6 +48,8 @@ class UserRead(BaseModel):
     is_active: bool
     # Indicates whether the user has admin privileges
     is_admin: bool
+    locale: str = "es"
+    iana_timezone: Optional[str] = None
 
     # Allow Pydantic to build this model directly from ORM (SQLAlchemy) objects
     model_config = ConfigDict(from_attributes=True)
