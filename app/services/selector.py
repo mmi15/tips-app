@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from zoneinfo import ZoneInfo
 from app.db.models import Subscription, Tip, Topic, Delivery
 
+PUBLISHED_STATUS = "published"
+
 # ==============================
 # Tip Selection Service
 # ==============================
@@ -62,7 +64,11 @@ def _tips_not_delivered_query(user_id: int, topic_id: int):
         .where(and_(Delivery.tip_id == Tip.id, Delivery.user_id == user_id))
         .limit(1)
     )
-    return select(Tip).where(Tip.topic_id == topic_id, ~exists(delivered_exists))
+    return select(Tip).where(
+        Tip.topic_id == topic_id,
+        Tip.status == PUBLISHED_STATUS,
+        ~exists(delivered_exists),
+    )
 
 
 def _pick_many_from_query(db: Session, base_q, limit: int, strategy: str) -> List[Tip]:
@@ -107,7 +113,10 @@ def pick_tip_for_topic(
     # 2) Fallback: deterministic rotation over all tips for this topic
     tz = ZoneInfo(tz_name)
     today_local = datetime.now(tz).date()
-    all_q = select(Tip).where(Tip.topic_id == topic_id).order_by(
+    all_q = select(Tip).where(
+        Tip.topic_id == topic_id,
+        Tip.status == PUBLISHED_STATUS,
+    ).order_by(
         Tip.created_at.asc(), Tip.id.asc()
     )
     all_tips = list(db.scalars(all_q))
@@ -148,7 +157,10 @@ def pick_daily_bundle(
         if len(picks) < per_topic:
             tz = ZoneInfo(tz_name)
             today_local = datetime.now(tz).date()
-            all_q = select(Tip).where(Tip.topic_id == topic.id).order_by(
+            all_q = select(Tip).where(
+                Tip.topic_id == topic.id,
+                Tip.status == PUBLISHED_STATUS,
+            ).order_by(
                 Tip.created_at.asc(), Tip.id.asc()
             )
             all_tips = list(db.scalars(all_q))
@@ -235,7 +247,10 @@ def _select_tip_for_user_topic_on_date(
     tips = (
         db.execute(
             select(Tip)
-            .where(Tip.topic_id == topic_id)
+            .where(
+                Tip.topic_id == topic_id,
+                Tip.status == PUBLISHED_STATUS,
+            )
             .order_by(Tip.id.asc())
         )
         .scalars()

@@ -170,3 +170,45 @@ def test_mark_delivery_read_idempotent(client, db_session: Session, admin_header
     p2 = client.patch(f"/me/tips/{delivery_id}/read", headers=user_headers())
     assert p2.status_code == 200
     assert p2.json()["status"] == "read"
+
+
+def test_today_ignores_draft_and_hidden_tips(client, admin_headers, user_headers):
+    topic = _create_topic(client, admin_headers(), name="Producto", slug="producto")
+
+    # Only this one should be eligible for delivery.
+    _create_tip(
+        client,
+        admin_headers(),
+        topic_id=topic["id"],
+        title="Visible",
+        body="published",
+    )
+    client.post(
+        "/tips",
+        headers=admin_headers(),
+        json={
+            "topic_id": topic["id"],
+            "title": "Borrador",
+            "body": "draft",
+            "status": "draft",
+            "source_url": None,
+        },
+    )
+    client.post(
+        "/tips",
+        headers=admin_headers(),
+        json={
+            "topic_id": topic["id"],
+            "title": "Oculto",
+            "body": "hidden",
+            "status": "hidden",
+            "source_url": None,
+        },
+    )
+
+    _subscribe(client, user_headers(), topic_id=topic["id"])
+    r = client.get("/me/tips/today?per_topic=1", headers=user_headers())
+    assert r.status_code == 200, r.text
+    payload = r.json()
+    assert payload["count"] == 1
+    assert payload["items"][0]["title"] == "Visible"
