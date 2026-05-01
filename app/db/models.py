@@ -105,6 +105,9 @@ class Tip(Base):
         "topics.id", ondelete="CASCADE"), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="published", server_default="published"
+    )  # draft | published | hidden
     source_url: Mapped[Optional[str]] = mapped_column(String(1024))
     fingerprint: Mapped[Optional[str]] = mapped_column(
         String(64), index=True)  # Used for deduplication

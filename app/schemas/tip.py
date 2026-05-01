@@ -17,6 +17,9 @@ from pydantic import BaseModel, Field, HttpUrl
 # ------------------------------
 
 
+ALLOWED_TIP_STATUSES = ("draft", "published", "hidden")
+
+
 class TipBase(BaseModel):
     # Topic ID the tip belongs to
     topic_id: int
@@ -34,6 +37,7 @@ class TipBase(BaseModel):
 class TipCreate(TipBase):
     # Optional unique fingerprint used for deduplication
     fingerprint: Optional[str] = None
+    status: str = Field(default="published", pattern="^(draft|published|hidden)$")
 
 
 # ------------------------------
@@ -46,6 +50,9 @@ class TipUpdate(BaseModel):
     body: Optional[str] = Field(None, max_length=5000)
     # Optional new source URL
     source_url: Optional[HttpUrl] = None
+    # Optional moderation status
+    status: Optional[str] = Field(
+        default=None, pattern="^(draft|published|hidden)$")
 
 
 # ------------------------------
@@ -60,6 +67,8 @@ class TipRead(BaseModel):
     title: str
     # Tip content
     body: str
+    # Publication status
+    status: str
     # Optional source link
     source_url: Optional[str]
     # Optional fingerprint (for deduplication)
