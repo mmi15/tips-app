@@ -159,7 +159,8 @@
       const adSec = $("admin-section");
       if (adSec) adSec.hidden = !currentIsAdmin;
       if (currentIsAdmin) {
-        await loadAdminTips();
+        // No bloquea el flujo principal si el panel admin tarda o falla.
+        loadAdminTips().catch((err) => showFlash(err.message, "error"));
       }
     } catch (e) {
       setToken(null);
