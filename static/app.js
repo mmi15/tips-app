@@ -35,6 +35,7 @@
   let historyLastSize = 10;
   let userLocale = "es";
   let currentIsAdmin = false;
+  let adminTopicsCache = [];
 
   const flash = $("flash");
   const authLoggedOut = $("auth-logged-out");
@@ -175,8 +176,12 @@
     host.innerHTML = '<p class="empty">Cargando…</p>';
     try {
       const st = ($("admin-tip-status").value || "").trim();
+      const topicId = ($("admin-tip-topic").value || "").trim();
+      const search = ($("admin-tip-search").value || "").trim();
       const q = new URLSearchParams({ page: "1", size: "50" });
       if (st) q.set("status", st);
+      if (topicId) q.set("topic_id", topicId);
+      if (search) q.set("q", search);
       const data = await api("/admin/tips?" + q.toString(), { method: "GET" });
       host.innerHTML = "";
       if (!data.items || !data.items.length) {
@@ -192,7 +197,10 @@
         const idSpan = document.createElement("span");
         idSpan.textContent = "ID " + tip.id;
         const topicSpan = document.createElement("span");
-        topicSpan.textContent = "Tema " + tip.topic_id;
+        const topicName = adminTopicNameById(tip.topic_id);
+        topicSpan.textContent = topicName
+          ? "Tema " + topicName + " (#" + tip.topic_id + ")"
+          : "Tema #" + tip.topic_id;
         const pill = document.createElement("span");
         const stVal = tip.status || "published";
         pill.className = "status-pill " + stVal;
@@ -248,6 +256,28 @@
       await loadAdminTips();
     } catch (e) {
       showFlash(e.message, "error");
+    }
+  }
+
+  function adminTopicNameById(topicId) {
+    const id = Number(topicId);
+    const t = adminTopicsCache.find((x) => Number(x.id) === id);
+    return t ? t.name : null;
+  }
+
+  function fillAdminTopicSelect(topics) {
+    const sel = $("admin-tip-topic");
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">Todos</option>';
+    for (const topic of topics) {
+      const o = document.createElement("option");
+      o.value = String(topic.id);
+      o.textContent = topic.name;
+      sel.appendChild(o);
+    }
+    if (prev && [...sel.options].some((opt) => opt.value === prev)) {
+      sel.value = prev;
     }
   }
 
@@ -432,6 +462,10 @@
       row.appendChild(right);
       host.appendChild(row);
     }
+
+    // Reuse topics for admin filters without extra fetches.
+    adminTopicsCache = topics;
+    fillAdminTopicSelect(topics);
   }
 
   function escapeHtml(s) {
@@ -625,6 +659,13 @@
 
   $("btn-admin-reload").addEventListener("click", () => loadAdminTips());
   $("admin-tip-status").addEventListener("change", () => loadAdminTips());
+  $("admin-tip-topic").addEventListener("change", () => loadAdminTips());
+  $("admin-tip-search").addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      loadAdminTips();
+    }
+  });
 
   $("btn-today").addEventListener("click", () => loadTodayTips());
 

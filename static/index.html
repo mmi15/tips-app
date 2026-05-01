@@ -144,6 +144,12 @@
         </p>
         <div class="admin-toolbar">
           <label class="field inline">
+            <span>Tema</span>
+            <select id="admin-tip-topic" aria-label="Filtrar tips por tema">
+              <option value="">Todos</option>
+            </select>
+          </label>
+          <label class="field inline">
             <span>Estado</span>
             <select id="admin-tip-status" aria-label="Filtrar tips por estado">
               <option value="">Todos</option>
@@ -151,6 +157,16 @@
               <option value="draft">Borradores</option>
               <option value="hidden">Ocultos</option>
             </select>
+          </label>
+          <label class="field inline">
+            <span>Buscar</span>
+            <input
+              type="text"
+              id="admin-tip-search"
+              placeholder="Título o contenido"
+              autocomplete="off"
+              spellcheck="false"
+            />
           </label>
           <button type="button" id="btn-admin-reload" class="btn secondary">
             Recargar lista
