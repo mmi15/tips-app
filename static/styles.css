@@ -96,6 +96,97 @@ body {
   align-self: center;
 }
 
+.badge-admin {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.12rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--bg);
+  background: var(--accent);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.admin-panel .admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-panel .admin-toolbar .field {
+  margin: 0;
+}
+
+.admin-tips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-tip-row {
+  padding: 0.85rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.admin-tip-row .admin-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.admin-tip-row .status-pill {
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.admin-tip-row .status-pill.published {
+  background: rgba(61, 156, 245, 0.2);
+  color: var(--accent);
+}
+
+.admin-tip-row .status-pill.draft {
+  background: rgba(139, 156, 179, 0.25);
+  color: var(--muted);
+}
+
+.admin-tip-row .status-pill.hidden {
+  background: rgba(240, 113, 120, 0.2);
+  color: var(--danger);
+}
+
+.admin-tip-row h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.admin-tip-row .preview {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
 .card h2.mt {
   margin-top: 1.5rem;
 }

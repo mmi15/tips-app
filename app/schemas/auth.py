@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel, EmailStr, ConfigDict
 
 # ==============================
@@ -47,6 +49,9 @@ class MeRead(BaseModel):
     id: int
     # User's email
     email: EmailStr
+    is_admin: bool = False
+    locale: str = "es"
+    iana_timezone: Optional[str] = None
 
     # Allow Pydantic to build the model directly
     # from ORM objects (e.g., SQLAlchemy instances)
