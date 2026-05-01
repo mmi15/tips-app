@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.db.session import get_db
 from app.db.models import User
 from app.api.deps import require_admin
+from app.schemas.tip import TipList, TipRead
+from app.services.tips import list_tips, get_tip
 
 
 # Create an APIRouter instance for admin-related endpoints
@@ -76,3 +78,38 @@ def demote_user(
     db.add(user)
     db.commit()
     return
+
+
+@router.get("/tips", response_model=TipList)
+def list_tips_for_admin(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    topic_id: int | None = Query(None),
+    status_filter: str | None = Query(
+        None, pattern="^(draft|published|hidden)$", alias="status"),
+    q: str | None = Query(None, description="Search in title/body"),
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin),
+):
+    items, total = list_tips(
+        db, page=page, size=size, topic_id=topic_id, status=status_filter, q=q
+    )
+    return TipList(total=total, page=page, size=size, items=items)
+
+
+@router.patch("/tips/{tip_id}/status", response_model=TipRead)
+def update_tip_status(
+    tip_id: int,
+    status_value: str = Query(..., pattern="^(draft|published|hidden)$", alias="status"),
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin),
+):
+    tip = get_tip(db, tip_id)
+    if not tip:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Tip not found")
+    tip.status = status_value
+    db.add(tip)
+    db.commit()
+    db.refresh(tip)
+    return tip

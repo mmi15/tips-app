@@ -34,6 +34,7 @@
   let historyLastTotal = 0;
   let historyLastSize = 10;
   let userLocale = "es";
+  let currentIsAdmin = false;
 
   const flash = $("flash");
   const authLoggedOut = $("auth-logged-out");
@@ -118,6 +119,13 @@
       authLoggedIn.hidden = true;
       appSection.hidden = true;
       $("user-email").textContent = "";
+      currentIsAdmin = false;
+      const badge = $("admin-badge");
+      if (badge) badge.hidden = true;
+      const adSec = $("admin-section");
+      if (adSec) adSec.hidden = true;
+      const adminList = $("admin-tips-list");
+      if (adminList) adminList.innerHTML = "";
     }
   }
 
@@ -145,10 +153,101 @@
       const me = await api("/auth/me", { method: "GET" });
       $("user-email").textContent = me.email || "";
       applyMeToPreferencesUi(me);
+      currentIsAdmin = Boolean(me.is_admin);
+      const badge = $("admin-badge");
+      if (badge) badge.hidden = !currentIsAdmin;
+      const adSec = $("admin-section");
+      if (adSec) adSec.hidden = !currentIsAdmin;
+      if (currentIsAdmin) {
+        await loadAdminTips();
+      }
     } catch (e) {
       setToken(null);
       updateAuthUi();
       showFlash(e.message || "Sesión no válida", "error");
+    }
+  }
+
+  async function loadAdminTips() {
+    if (!getToken() || !currentIsAdmin) return;
+    const host = $("admin-tips-list");
+    if (!host) return;
+    host.innerHTML = '<p class="empty">Cargando…</p>';
+    try {
+      const st = ($("admin-tip-status").value || "").trim();
+      const q = new URLSearchParams({ page: "1", size: "50" });
+      if (st) q.set("status", st);
+      const data = await api("/admin/tips?" + q.toString(), { method: "GET" });
+      host.innerHTML = "";
+      if (!data.items || !data.items.length) {
+        host.innerHTML =
+          '<p class="empty">No hay tips con este filtro.</p>';
+        return;
+      }
+      for (const tip of data.items) {
+        const row = document.createElement("div");
+        row.className = "admin-tip-row";
+        const meta = document.createElement("div");
+        meta.className = "admin-meta";
+        const idSpan = document.createElement("span");
+        idSpan.textContent = "ID " + tip.id;
+        const topicSpan = document.createElement("span");
+        topicSpan.textContent = "Tema " + tip.topic_id;
+        const pill = document.createElement("span");
+        const stVal = tip.status || "published";
+        pill.className = "status-pill " + stVal;
+        pill.textContent = stVal;
+        meta.appendChild(idSpan);
+        meta.appendChild(topicSpan);
+        meta.appendChild(pill);
+        row.appendChild(meta);
+        const h = document.createElement("h3");
+        h.textContent = tip.title;
+        row.appendChild(h);
+        const prev = document.createElement("p");
+        prev.className = "preview";
+        const bodyText = (tip.body || "").replace(/\s+/g, " ").trim();
+        prev.textContent =
+          bodyText.length > 160 ? bodyText.slice(0, 160) + "…" : bodyText;
+        row.appendChild(prev);
+        const actions = document.createElement("div");
+        actions.className = "admin-actions";
+        function addBtn(label, statusVal) {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "btn small secondary";
+          b.textContent = label;
+          b.addEventListener("click", () =>
+            setAdminTipStatus(tip.id, statusVal)
+          );
+          actions.appendChild(b);
+        }
+        addBtn("Publicar", "published");
+        addBtn("Borrador", "draft");
+        addBtn("Ocultar", "hidden");
+        row.appendChild(actions);
+        host.appendChild(row);
+      }
+    } catch (e) {
+      host.innerHTML = "";
+      showFlash(e.message, "error");
+    }
+  }
+
+  async function setAdminTipStatus(tipId, status) {
+    try {
+      clearFlash();
+      await api(
+        "/admin/tips/" +
+          tipId +
+          "/status?status=" +
+          encodeURIComponent(status),
+        { method: "PATCH" }
+      );
+      showFlash("Estado actualizado.", "ok");
+      await loadAdminTips();
+    } catch (e) {
+      showFlash(e.message, "error");
     }
   }
 
@@ -523,6 +622,9 @@
     historyPage = 1;
     historyLastTotal = 0;
   });
+
+  $("btn-admin-reload").addEventListener("click", () => loadAdminTips());
+  $("admin-tip-status").addEventListener("change", () => loadAdminTips());
 
   $("btn-today").addEventListener("click", () => loadTodayTips());
 

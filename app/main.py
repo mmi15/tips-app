@@ -55,6 +55,14 @@ def bootstrap_admin():
             db.add(u)
             db.commit()
             print(f"[BOOTSTRAP] User {ADMIN_EMAIL} promoted to admin.")
+        elif not u:
+            print(
+                f"[BOOTSTRAP] ADMIN_EMAIL={ADMIN_EMAIL!r}: aún no hay usuario con ese email. "
+                "Regístrate con ese correo (o ejecuta `python -m app.scripts.ensure_admin EMAIL --password ...`) "
+                "y reinicia la app."
+            )
+        elif u.is_admin:
+            print(f"[BOOTSTRAP] {ADMIN_EMAIL!r} ya es administrador.")
     finally:
         # Always close the session to free resources
         db.close()

@@ -10,6 +10,14 @@ from app.db.models import Tip, Topic, Delivery
 from app.schemas.tip import TipCreate, TipUpdate
 import hashlib
 
+def _validate_tip_status(status: str) -> str:
+    allowed = {"draft", "published", "hidden"}
+    if status not in allowed:
+        raise ValueError(
+            "Invalid tip status. Use: draft, published, hidden")
+    return status
+
+
 # ==============================
 # Tip Service Layer
 # ==============================
@@ -63,6 +71,7 @@ def create_tip(db: Session, data: TipCreate) -> Tip:
         topic_id=data.topic_id,
         title=data.title,
         body=data.body,
+        status=_validate_tip_status(data.status),
         source_url=str(data.source_url) if data.source_url else None,
         fingerprint=fp,
     )
@@ -88,6 +97,7 @@ def list_tips(
     page: int = 1,
     size: int = 20,
     topic_id: Optional[int] = None,
+    status: Optional[str] = None,
     q: Optional[str] = None,
 ) -> Tuple[List[Tip], int]:
     """
@@ -101,6 +111,10 @@ def list_tips(
     if topic_id:
         stmt = stmt.where(Tip.topic_id == topic_id)
         count_stmt = count_stmt.where(Tip.topic_id == topic_id)
+
+    if status:
+        stmt = stmt.where(Tip.status == _validate_tip_status(status))
+        count_stmt = count_stmt.where(Tip.status == _validate_tip_status(status))
 
     # Optional search query (case-insensitive)
     if q:
@@ -137,6 +151,9 @@ def update_tip(db: Session, tip: Tip, data: TipUpdate) -> Tip:
             str(payload["source_url"]
                 ) if payload["source_url"] is not None else None
         )
+
+    if "status" in payload:
+        payload["status"] = _validate_tip_status(payload["status"])
 
     # Apply field changes
     for field, value in payload.items():

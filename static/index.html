@@ -128,9 +128,35 @@
           </div>
         </div>
         <div id="auth-logged-in" hidden>
-          <p class="user-line">Sesión: <strong id="user-email"></strong></p>
+          <p class="user-line">
+            Sesión: <strong id="user-email"></strong>
+            <span id="admin-badge" class="badge-admin" hidden>Admin</span>
+          </p>
           <button type="button" id="btn-logout" class="btn ghost">Cerrar sesión</button>
         </div>
+      </section>
+
+      <section id="admin-section" class="card admin-panel" hidden>
+        <h2>Panel de administración</h2>
+        <p class="hint">
+          Moderar tips (estado). La API completa sigue en
+          <a href="/docs" target="_blank" rel="noopener noreferrer">/docs</a>.
+        </p>
+        <div class="admin-toolbar">
+          <label class="field inline">
+            <span>Estado</span>
+            <select id="admin-tip-status" aria-label="Filtrar tips por estado">
+              <option value="">Todos</option>
+              <option value="published">Publicados</option>
+              <option value="draft">Borradores</option>
+              <option value="hidden">Ocultos</option>
+            </select>
+          </label>
+          <button type="button" id="btn-admin-reload" class="btn secondary">
+            Recargar lista
+          </button>
+        </div>
+        <div id="admin-tips-list" class="admin-tips-list"></div>
       </section>
 
       <section id="app-section" class="card" hidden>
@@ -206,7 +232,11 @@
     </main>
 
     <footer class="footer">
-      <small>MVP local — misma API que <code>/docs</code></small>
+      <small>
+        MVP local — API en <code>/docs</code>. Primer admin:
+        <code>ADMIN_EMAIL</code> en <code>.env</code>, registro con ese email y reinicio; o
+        <code>python -m app.scripts.ensure_admin tu@email.com --password …</code>
+      </small>
     </footer>
 
     <script src="/static/app.js"></script>
