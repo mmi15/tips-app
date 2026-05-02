@@ -36,6 +36,8 @@ class User(Base):
         String(16), nullable=False, default="es", server_default="es")
     iana_timezone: Mapped[Optional[str]] = mapped_column(
         String(64), nullable=True)
+    email_digest_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0")
 
     # Relationships
     subscriptions: Mapped[List["Subscription"]] = relationship(

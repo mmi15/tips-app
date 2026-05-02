@@ -14,6 +14,7 @@ _LOCALE_RE = re.compile(r"^[a-z]{2}(-[A-Za-z0-9]{2,8})?$")
 class UserPreferencesRead(BaseModel):
     locale: str
     iana_timezone: Optional[str] = None
+    email_digest_enabled: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -21,6 +22,7 @@ class UserPreferencesRead(BaseModel):
 class UserPreferencesUpdate(BaseModel):
     locale: Optional[str] = Field(None, min_length=2, max_length=16)
     iana_timezone: Optional[str] = Field(None, max_length=64)
+    email_digest_enabled: Optional[bool] = None
 
     @field_validator("locale")
     @classmethod

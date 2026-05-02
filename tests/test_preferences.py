@@ -7,6 +7,7 @@ def test_preferences_get_default(client, user_headers):
     data = r.json()
     assert data["locale"] == "es"
     assert data["iana_timezone"] is None
+    assert data["email_digest_enabled"] is False
 
 
 def test_preferences_patch_and_get(client, user_headers):
@@ -54,6 +55,18 @@ def test_today_omitted_tz_uses_stored_timezone(client, user_headers):
     )
     r = client.get("/me/tips/today?per_topic=1", headers=user_headers)
     assert r.status_code == 200, r.text
+
+
+def test_preferences_email_digest(client, user_headers):
+    r = client.patch(
+        "/me/preferences",
+        headers=user_headers,
+        json={"email_digest_enabled": True},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["email_digest_enabled"] is True
+    r2 = client.get("/me/preferences", headers=user_headers)
+    assert r2.json()["email_digest_enabled"] is True
 
 
 def test_today_query_tz_overrides_stored(client, user_headers):

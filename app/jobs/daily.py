@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.services.ingest import ingest_all_configured_feeds
 from app.services.selector import create_daily_deliveries_for_all_users
+from app.services.email_digest import run_email_digest
 
 
 def run_daily_job(target_date: date | None = None) -> None:
@@ -25,6 +26,9 @@ def run_daily_job(target_date: date | None = None) -> None:
             db, target_date=target_date)
         print(
             f"[DAILY] Deliveries creados para {target_date}: {deliveries_count}")
+
+        email_count = run_email_digest(db, target_date=target_date)
+        print(f"[DAILY] Emails digest: {email_count}")
 
         print("[DAILY] Job diario completado OK.")
     except Exception as e:

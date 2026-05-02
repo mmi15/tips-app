@@ -229,6 +229,10 @@
     } else {
       tzEl.value = getSavedTimeZone();
     }
+    const digestEl = $("pref-email-digest");
+    if (digestEl) {
+      digestEl.checked = Boolean(me && me.email_digest_enabled);
+    }
   }
 
   async function refreshMe() {
@@ -243,7 +247,7 @@
       const adSec = $("admin-section");
       if (adSec) adSec.hidden = !currentIsAdmin;
       if (currentIsAdmin) {
-        await loadAdminTips();
+        loadAdminTips().catch((err) => showFlash(err.message, "error"));
       }
     } catch (e) {
       setToken(null);
@@ -762,6 +766,7 @@
       clearFlash();
       const body = { locale };
       body.iana_timezone = tzRaw || null;
+      body.email_digest_enabled = $("pref-email-digest").checked;
       const updated = await api("/me/preferences", {
         method: "PATCH",
         body: JSON.stringify(body),

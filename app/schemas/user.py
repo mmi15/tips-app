@@ -50,6 +50,7 @@ class UserRead(BaseModel):
     is_admin: bool
     locale: str = "es"
     iana_timezone: Optional[str] = None
+    email_digest_enabled: bool = False
 
     # Allow Pydantic to build this model directly from ORM (SQLAlchemy) objects
     model_config = ConfigDict(from_attributes=True)

@@ -52,6 +52,7 @@ class MeRead(BaseModel):
     is_admin: bool = False
     locale: str = "es"
     iana_timezone: Optional[str] = None
+    email_digest_enabled: bool = False
 
     # Allow Pydantic to build the model directly
     # from ORM objects (e.g., SQLAlchemy instances)
