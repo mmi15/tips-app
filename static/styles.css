@@ -149,6 +149,28 @@ body {
   align-self: center;
 }
 
+.pref-email-digest {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.pref-email-digest input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.pref-email-digest code {
+  font-size: 0.82em;
+  background: var(--bg);
+  padding: 0.05rem 0.25rem;
+  border-radius: 4px;
+}
+
 .badge-admin {
   display: inline-block;
   margin-left: 0.5rem;

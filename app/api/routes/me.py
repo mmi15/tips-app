@@ -18,10 +18,8 @@ from app.services.tips import (
     get_delivery_history,
     mark_delivery_read,
 )
-from app.services.selector import (
-    pick_daily_bundle,
-    get_user_subscribed_topics,
-)
+from app.services.selector import pick_daily_bundle
+from app.services.plan_policy import apply_plan_policy
 
 
 # Router for "me" (current authenticated user) endpoints.
@@ -46,6 +44,8 @@ def patch_my_preferences(
         current_user.locale = data["locale"]
     if "iana_timezone" in data:
         current_user.iana_timezone = data["iana_timezone"]
+    if "email_digest_enabled" in data:
+        current_user.email_digest_enabled = bool(data["email_digest_enabled"])
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
@@ -137,35 +137,3 @@ def mark_tip_as_read(
 ):
     # Delegate to service layer to validate ownership and update read status.
     return mark_delivery_read(db, user_id=current_user.id, delivery_id=delivery_id)
-
-
-def apply_plan_policy(
-    db: Session,
-    user,
-    requested_per_topic: int,
-) -> tuple[list, int]:
-    """
-    Apply plan limits without touching the DB:
-    - Free (default): max 3 topics and 1 tip per topic.
-    - Temporary Premium: user.is_admin == True (until we have a proper plan field).
-    Returns (allowed_topics, effective_per_topic).
-    """
-    # Temporary premium flag: treat admins as premium until a real plan model exists.
-    is_premium = bool(getattr(user, "is_admin", False))
-
-    # Fetch all topics the user is currently subscribed to.
-    all_topics = get_user_subscribed_topics(db, user.id)
-
-    if is_premium:
-        # Premium: no limits; honor the requested per-topic count.
-        per_topic_effective = requested_per_topic
-        topics_allowed = all_topics
-    else:
-        # Free: enforce strict limits.
-        per_topic_effective = 1
-        # Deterministically pick up to 3 topics (sorted by name/slug for stable selection).
-        topics_sorted = sorted(
-            all_topics, key=lambda t: (t.name or "", t.slug or ""))
-        topics_allowed = topics_sorted[:3]
-
-    return topics_allowed, per_topic_effective
