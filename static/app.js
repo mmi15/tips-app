@@ -1,6 +1,8 @@
 (function () {
   const TOKEN_KEY = "tips_access_token";
   const TZ_STORAGE_KEY = "tips_tz";
+  /** Tiempo máximo de espera por petición (evita “cargando” infinito). */
+  const API_TIMEOUT_MS = 28000;
 
   const $ = (id) => document.getElementById(id);
 
@@ -36,6 +38,7 @@
   let userLocale = "es";
   let currentIsAdmin = false;
   let adminTopicsCache = [];
+  let apiInFlight = 0;
 
   const flash = $("flash");
   const authLoggedOut = $("auth-logged-out");
@@ -70,30 +73,110 @@
     return h;
   }
 
-  async function api(path, options = {}) {
-    const res = await fetch(path, {
-      ...options,
-      headers: { ...authHeaders(), ...(options.headers || {}) },
-    });
-    const text = await res.text();
-    let data = null;
-    if (text) {
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = text;
+  function formatApiErrorMessage(res, data) {
+    if (data && Array.isArray(data.detail)) {
+      const parts = data.detail.map(function (e) {
+        if (typeof e === "string") return e;
+        if (e && typeof e.msg === "string") return e.msg;
+        return JSON.stringify(e);
+      });
+      return parts.filter(Boolean).join(" · ");
+    }
+    if (data && typeof data.detail === "string") return data.detail;
+    const st = res.status;
+    if (st === 401) {
+      return "Sesión no válida o caducada. Vuelve a iniciar sesión.";
+    }
+    if (st === 403) {
+      return "No tienes permiso para esta acción.";
+    }
+    if (st === 404) {
+      return "Recurso no encontrado.";
+    }
+    if (st === 422) {
+      return "Datos no válidos. Revisa los campos e inténtalo de nuevo.";
+    }
+    if (st >= 500) {
+      return "Error del servidor. Inténtalo más tarde.";
+    }
+    return res.statusText || "Error al contactar con el servidor.";
+  }
+
+  function updateGlobalLoadingUi() {
+    const bar = $("global-loading");
+    const mainEl = document.querySelector("main.main");
+    const busy = apiInFlight > 0;
+    if (bar) {
+      bar.hidden = !busy;
+      bar.setAttribute("aria-hidden", busy ? "false" : "true");
+    }
+    if (mainEl) {
+      mainEl.setAttribute("aria-busy", busy ? "true" : "false");
+    }
+  }
+
+  function bumpApiInFlight(delta) {
+    apiInFlight = Math.max(0, apiInFlight + delta);
+    updateGlobalLoadingUi();
+  }
+
+  async function api(path, options) {
+    bumpApiInFlight(1);
+    try {
+      const opts = options || {};
+      const timeoutMs =
+        typeof opts.timeoutMs === "number" ? opts.timeoutMs : API_TIMEOUT_MS;
+      const fetchOpts = {};
+      for (const k in opts) {
+        if (
+          k !== "timeoutMs" &&
+          Object.prototype.hasOwnProperty.call(opts, k)
+        ) {
+          fetchOpts[k] = opts[k];
+        }
       }
+
+      const controller = new AbortController();
+      const tid = setTimeout(function () {
+        controller.abort();
+      }, timeoutMs);
+
+      let res;
+      try {
+        res = await fetch(path, {
+          ...fetchOpts,
+          signal: controller.signal,
+          headers: { ...authHeaders(), ...(fetchOpts.headers || {}) },
+        });
+      } catch (err) {
+        clearTimeout(tid);
+        if (err && err.name === "AbortError") {
+          throw new Error(
+            "La petición tardó demasiado. Comprueba la conexión o que el servidor esté en marcha."
+          );
+        }
+        throw new Error(
+          "No se pudo conectar con el servidor. ¿La API está activa y en la misma dirección?"
+        );
+      }
+      clearTimeout(tid);
+
+      const text = await res.text();
+      let data = null;
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = text;
+        }
+      }
+      if (!res.ok) {
+        throw new Error(formatApiErrorMessage(res, data));
+      }
+      return data;
+    } finally {
+      bumpApiInFlight(-1);
     }
-    if (!res.ok) {
-      const detail =
-        data && data.detail !== undefined
-          ? typeof data.detail === "string"
-            ? data.detail
-            : JSON.stringify(data.detail)
-          : res.statusText;
-      throw new Error(detail || "Error de red");
-    }
-    return data;
   }
 
   function setAuthTab(registerActive) {
