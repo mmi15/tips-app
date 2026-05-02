@@ -26,6 +26,59 @@ body {
   line-height: 1.5;
 }
 
+/* Indicador global: peticiones API en curso */
+.global-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 9999;
+  pointer-events: none;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.global-loading::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: 42%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent),
+    var(--accent-dim),
+    transparent
+  );
+  animation: global-loading-slide 0.95s ease-in-out infinite;
+}
+
+@keyframes global-loading-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(340%);
+  }
+}
+
+.global-loading[hidden] {
+  display: none !important;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .header {
   padding: 2rem 1.5rem 1rem;
   text-align: center;

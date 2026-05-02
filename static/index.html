@@ -7,12 +7,22 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
+    <div
+      id="global-loading"
+      class="global-loading"
+      role="progressbar"
+      aria-valuetext="Cargando"
+      aria-hidden="true"
+      hidden
+    >
+      <span class="visually-hidden">Cargando, por favor espera.</span>
+    </div>
     <header class="header">
       <h1>Tips</h1>
       <p class="tagline">Un tip corto al día por cada tema que elijas</p>
     </header>
 
-    <main class="main">
+    <main class="main" aria-busy="false">
       <p id="flash" class="flash" role="status" hidden></p>
 
       <section id="auth-section" class="card">
